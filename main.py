@@ -49,4 +49,19 @@ if __name__=='__main__':
     ping_status = redis_client.ping()
     print("Ping successful:", ping_status)
     first=firts_step(redis_client)
-    
+    if first==True:
+        cursor = 0
+        while True:
+            try:
+                choice=int(input('-1: Cerca utente\n-2: Visualizza contatti\n-3 esci\n'))
+                if choice==1:
+                    searched_user=input('Inserisci il nome da cercare: ')
+                    cursor, keys = redis_client.scan(cursor=cursor, match=f'user:name:{searched_user}*', count=10)
+                    for key in keys:
+                        key=key.decode('utf-8').split(':')
+                        print(f'-Username: {key[2]}')
+                    
+            except Exception as error:
+                print(error)   
+    else:
+        print('close')
