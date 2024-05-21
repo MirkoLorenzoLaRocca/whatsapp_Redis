@@ -145,8 +145,41 @@ def stamp_contacts():
     if len(list_of_contacts)>0:
         for index in range(len(list_of_contacts)):
             print(f'-{index+1}: {list_of_contacts[index]}')
-        print('-0: Exit\n'+'-'*20)   
-          
+        print('-0: Exit\n')   
+
+def chatChoice_page():
+    contact_choice=int(input('Seleziona un contatto: '))-1 # Il fatto del -1 è perchè a schermo viene stampato con un +1 per una questione estetica   
+    if contact_choice!=-1:
+        while True:  
+            os.system('cls')
+            chat_choice=int(input(f'<{list_of_contacts[contact_choice]}>\n-1: Chat\n-2: Chat a tempo\n-3: Cancella Contatto\n-0: Exit\n'))
+            os.system('cls')
+            match chat_choice:
+                case 1:
+                    while True:
+                        # Fase di Chat manca la visualizzazione dei messagi precedenti
+                        msg=str(input('     '*50+'Type: QuitChat\nScrivi: '))
+                        if msg !='QuitChat':
+                            timestamp = int(time.time() * 1000)
+                            msg_id=redis_client.get(f'chat:msgId:{username}')
+                            redis_client.zadd(f'chat:{username}:{list_of_contacts[contact_choice]}',{f'{msg_id}:{msg}':timestamp}) #chive il time stamp del messaggio
+                            redis_client.zadd(f'user:contacts:{list_of_contacts[contact_choice]}',{username: timestamp})
+                            redis_client.incr(f'chat:msgId:{username}')
+                        else:
+                            break
+                case 2:
+                    pass
+                case 3:
+                    delete_user_form_contacts()
+                    break   
+                case 0:
+                    break
+    else:
+        os.system('cls')
+        print('fatti degli amici')
+        time.sleep(0.5)
+                
+            
 if __name__=='__main__':
     redis_client=start_client()
     ping_status = redis_client.ping()
@@ -157,44 +190,14 @@ if __name__=='__main__':
         while True:
             os.system('cls')
             try:
-                choice=int(input(f'<{username}>\n-1: Cerca utente\n-2: Visualizza contatti\n-0: Esci\n'+'-'*20))
+                choice=int(input(f'<{username}>\n-1: Cerca utente\n-2: Visualizza contatti\n-0: Esci\n'))
                 os.system('cls')
                 if choice==1:
                     add_contacts()
-                    list_of_contacts=[]
                 elif choice==2:
                     stamp_contacts()  
-                    contact_choice=int(input('Seleziona un contatto: '))-1 # Il fatto del -1 è perchè a schermo viene stampato con un +1 per una questione estetica
-                        
-                    if contact_choice!=-1:
-                        while True:  
-                            os.system('cls')
-                            chat_choice=int(input(f'<{list_of_contacts[contact_choice]}>\n-1: Chat\n-2: Chat a tempo\n-3: Cancella Contatto\n-0: Exit\n'+'-'*20))
-                            os.system('cls')
-                            if chat_choice==1:
-                                while True:
-                                    # Fase di Chat manca la visualizzazione dei messagi precedenti
-                                    msg=str(input('     '*50+'Type: QuitChat\nScrivi: '))
-                                    if msg !='QuitChat':
-                                        timestamp = int(time.time() * 1000)
-                                        msg_id=redis_client.get(f'chat:msgId:{username}')
-                                        redis_client.zadd(f'chat:{username}:{list_of_contacts[contact_choice]}',{f'{msg_id}:{msg}':timestamp}) #chive il time stamp del messaggio
-                                        redis_client.zadd(f'user:contacts:{list_of_contacts[contact_choice]}',{username: timestamp})
-                                        redis_client.incr(f'chat:msgId:{username}')
-                                    else:
-                                        break
-                            elif chat_choice==2:
-                                pass
-                            elif chat_choice==3:
-                                delete_user_form_contacts()
-                                break   
-                            elif chat_choice==0:
-                                break                                
-                    else:
-                        os.system('cls')
-                        print('fatti degli amici')
-                        time.sleep(0.5)
-                    list_of_contacts=[]      
+                    chatChoice_page()
+                    list_of_contacts=[]            
                 elif choice==0:
                     break
                 else:
