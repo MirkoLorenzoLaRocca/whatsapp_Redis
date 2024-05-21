@@ -35,13 +35,11 @@ def login():
             os.system('cls')
             print('password is incorrect')
             time.sleep(1)
-            return 'no'
     else:
         os.system('cls')
         print(f'{username} does not exist')
         time.sleep(1)
-        return 'no'
-    
+            
 def sign_up():
     """
     Registrazione utente con la creazione delle chiavi:
@@ -70,8 +68,7 @@ def first_page():
             os.system('cls')
             match choice:
                 case 1:
-                    if login() !='no':
-                        return login()
+                    return login()
                 case 2:
                     sign_up()
                 case 0:
@@ -120,7 +117,36 @@ def add_contacts():
         print('No user found\nComeback to menu')
         time.sleep(1)
 
-        
+def delete_user_form_contacts():
+    os.system('cls')
+    confirm=int(input('Se elimini il contatto verranno cancellati anche i messaggi\n-1: continua\n-0: Exit\n'))
+    match confirm:
+        case 1:
+            contacts1 = f'user:contacts:{username}'
+            contacts2 = f'user:contacts:{list_of_contacts[contact_choice]}'
+            
+            chat1 = f'chat:{username}:{list_of_contacts[contact_choice]}'
+            chat2 = f'chat:{list_of_contacts[contact_choice]}:{username}'
+            
+            if redis_client.zrem(contacts1, list_of_contacts[contact_choice]) and redis_client.zrem(contacts2, username):
+                print('Eliminazione dei contatti riuscita.')
+            if redis_client.delete(chat1) and redis_client.delete(chat2):
+                print('Eliminazione delle chat riuscita.')
+        case 0:
+            print('Operazione annullata.')
+        case _:
+            raise TypeError("Input non valido.")
+
+def stamp_contacts():
+    # Stampa di tutti i contatti in ordine di Score (il timeStamp dell'ultimo messaggio)
+    contacts=redis_client.zrangebyscore(f'user:contacts:{username}','-inf', '+inf')
+    for contact in contacts:
+        list_of_contacts.append(f'{contact}')
+    if len(list_of_contacts)>0:
+        for index in range(len(list_of_contacts)):
+            print(f'-{index+1}: {list_of_contacts[index]}')
+        print('-0: Exit\n'+'-'*20)   
+          
 if __name__=='__main__':
     redis_client=start_client()
     ping_status = redis_client.ping()
@@ -131,55 +157,44 @@ if __name__=='__main__':
         while True:
             os.system('cls')
             try:
-                choice=int(input('-1: Cerca utente\n-2: Visualizza contatti\n-0: Esci\n'))
+                choice=int(input(f'<{username}>\n-1: Cerca utente\n-2: Visualizza contatti\n-0: Esci\n'+'-'*20))
                 os.system('cls')
                 if choice==1:
                     add_contacts()
+                    list_of_contacts=[]
                 elif choice==2:
-                    # Stampa di tutti i contatti in ordine di Score (il timeStamp dell'ultimo messaggio)
-                    contacts=redis_client.zrangebyscore(f'user:contacts:{username}','-inf', '+inf')
-                    for contact in contacts:
-                        list_of_contacts.append(f'{contact}')
-                    if len(list_of_contacts)>0:
-                        for index in range(len(list_of_contacts)):
-                            print(f'-{index+1}: {list_of_contacts[index]}')
-                        print('-0: Exit\n'+'-'*20)   
-                        contact_choice=int(input('Seleziona un contatto: '))-1 # Il fatto del -1 è perchè a schermo viene stampato con un +1 per una questione estetica
-                        print('-'*20)
+                    stamp_contacts()  
+                    contact_choice=int(input('Seleziona un contatto: '))-1 # Il fatto del -1 è perchè a schermo viene stampato con un +1 per una questione estetica
                         
-                        if contact_choice!=-1:
-                            while True:  
-                                os.system('cls')
-                                chat_choice=int(input(f'-1: Chat\n-2: Chat a tempo\n-3: Cancella Contatto\n-0: Exit\n'))
-                                os.system('cls')
-                                if chat_choice==1:
-                                    while True:
-                                        # Fase di Chat manca la visualizzazione dei messagi precedenti
-                                        msg=str(input('     '*50+'Type: QuitChat\nScrivi: '))
-                                        if msg !='QuitChat':
-                                            timestamp = int(time.time() * 1000)
-                                            msg_id=redis_client.get(f'chat:msgId:{username}')
-                                            redis_client.zadd(f'chat:{username}:{list_of_contacts[contact_choice]}',{f'{msg_id}:{msg}':timestamp}) #chive il time stamp del messaggio
-                                            redis_client.zadd(f'user:contacts:{list_of_contacts[contact_choice]}',{username: timestamp})
-                                            redis_client.incr(f'chat:msgId:{username}')
-                                        else:
-                                            break
-                                elif chat_choice==2:
-                                    pass
-                                elif chat_choice==3:
-                                    os.system('cls')
-                                    confirm=int(input('Se elimini il contatto verranno cancellati anche i messaggi\n-1: continua\n-0: Exit'))
-                                    if confirm==1:
-                                        redis_client.zrem(f'user:contacts:{username}',f'{list_of_contacts[contact_choice]}' )
-                                        redis_client.zrem(f'user:contacts:{list_of_contacts[contact_choice]}',{username})
-                                        redis_client.delete(f'chat:{username}:{list_of_contacts[contact_choice]}')
-                                        redis_client.delete(f'chat:{list_of_contacts[contact_choice]}:{username}')
-
-                                elif chat_choice==0:
-                                    break
-                        else:
-                            print('-'*20)
-                            print('fatti degli amici')  
+                    if contact_choice!=-1:
+                        while True:  
+                            os.system('cls')
+                            chat_choice=int(input(f'<{list_of_contacts[contact_choice]}>\n-1: Chat\n-2: Chat a tempo\n-3: Cancella Contatto\n-0: Exit\n'+'-'*20))
+                            os.system('cls')
+                            if chat_choice==1:
+                                while True:
+                                    # Fase di Chat manca la visualizzazione dei messagi precedenti
+                                    msg=str(input('     '*50+'Type: QuitChat\nScrivi: '))
+                                    if msg !='QuitChat':
+                                        timestamp = int(time.time() * 1000)
+                                        msg_id=redis_client.get(f'chat:msgId:{username}')
+                                        redis_client.zadd(f'chat:{username}:{list_of_contacts[contact_choice]}',{f'{msg_id}:{msg}':timestamp}) #chive il time stamp del messaggio
+                                        redis_client.zadd(f'user:contacts:{list_of_contacts[contact_choice]}',{username: timestamp})
+                                        redis_client.incr(f'chat:msgId:{username}')
+                                    else:
+                                        break
+                            elif chat_choice==2:
+                                pass
+                            elif chat_choice==3:
+                                delete_user_form_contacts()
+                                break   
+                            elif chat_choice==0:
+                                break                                
+                    else:
+                        os.system('cls')
+                        print('fatti degli amici')
+                        time.sleep(0.5)
+                    list_of_contacts=[]      
                 elif choice==0:
                     break
                 else:
