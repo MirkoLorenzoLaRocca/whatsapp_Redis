@@ -149,6 +149,8 @@ def delete_user_form_contacts(contact_choice):
 def chatChoice_page(contact_choice):
     # Il fatto del -1 è perchè a schermo viene stampato con un +1 per una questione estetica   
     if contact_choice!=-1:
+        print(redis_client.getbit('non_disturbare', redis_client.hget('utente_bit', list_of_contacts[contact_choice])))
+        print(type(redis_client.getbit('non_disturbare', redis_client.hget('utente_bit', list_of_contacts[contact_choice]))))
         while True:  
             os.system('cls')
             chat_choice=int(input(f'<{list_of_contacts[contact_choice]}>\n-1: Chat\n-2: Chat a tempo\n-3: Cancella Contatto\n-0: Exit\n'))
@@ -158,13 +160,17 @@ def chatChoice_page(contact_choice):
                     while True:
                         #  manca la visualizzazione dei messagi precedenti e la live chat
                         msg=str(input('   '*50+'Type: QuitChat\nScrivi: '))
-                        if msg !='QuitChat':
+                        if msg !='QuitChat' and redis_client.getbit('non_disturbare', redis_client.hget('utente_bit', list_of_contacts[contact_choice]))==0:
                             timestamp = int(time.time() * 1000)
                             msg_id=redis_client.get(f'chat:msgId:{username}')
                             # chat:<mittente>:<destinatario>->zset member= <timestamp>:msf score=timestamp
                             # from timestamp int to date format -> datetime.datetime.fromtimestamp(timestamp_s).strftime('%d-%m-%Y %H:%M')
                             redis_client.zadd(f'chat:{username}:{list_of_contacts[contact_choice]}',{f'{timestamp}:{msg}':timestamp}) 
                             redis_client.zadd(f'user:contacts:{list_of_contacts[contact_choice]}',{username: timestamp})
+                        elif msg !='QuitChat' and redis_client.getbit('non_disturbare', redis_client.hget('utente_bit', list_of_contacts[contact_choice]))==1:
+                            print("Errore, l'utente selezionato è in modalità non disturbare. Non è pertanto raggiungibile fino a quando la modalità non disturbare sarà disattivata")
+                            time.sleep(3)
+                            break
                         else:
                             break
                 case 2:
