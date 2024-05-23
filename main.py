@@ -1,6 +1,6 @@
 import redis
 import time
-import datetime #datetime.datetime.fromtimestamp(timestamp_s).strftime('%d-%m-%Y %H:%M')
+import datetime
 import os
 
 def start_client():
@@ -58,6 +58,7 @@ def sign_up():
         psw=str(input('Insert password: '))
         redis_client.set(f'user:name:{username}',username)
         redis_client.set(f'user:psw:{username}',psw)
+        assegnamento_utente_bit(username)
         print('account cretated')
         time.sleep(1)    
 
@@ -146,8 +147,10 @@ def delete_user_form_contacts(contact_choice):
             raise TypeError("Input non valido.")
 
 def chatChoice_page(contact_choice):
-     # Il fatto del -1 è perchè a schermo viene stampato con un +1 per una questione estetica   
+    # Il fatto del -1 è perchè a schermo viene stampato con un +1 per una questione estetica   
     if contact_choice!=-1:
+        print(redis_client.getbit('non_disturbare', redis_client.hget('utente_bit', list_of_contacts[contact_choice])))
+        print(type(redis_client.getbit('non_disturbare', redis_client.hget('utente_bit', list_of_contacts[contact_choice]))))
         while True:  
             os.system('cls')
             chat_choice=int(input(f'<{list_of_contacts[contact_choice]}>\n-1: Chat\n-2: Chat a tempo\n-3: Cancella Contatto\n-0: Exit\n'))
@@ -157,13 +160,17 @@ def chatChoice_page(contact_choice):
                     while True:
                         #  manca la visualizzazione dei messagi precedenti e la live chat
                         msg=str(input('   '*50+'Type: QuitChat\nScrivi: '))
-                        if msg !='QuitChat':
+                        if msg !='QuitChat' and redis_client.getbit('non_disturbare', redis_client.hget('utente_bit', list_of_contacts[contact_choice]))==0:
                             timestamp = int(time.time() * 1000)
                             msg_id=redis_client.get(f'chat:msgId:{username}')
                             # chat:<mittente>:<destinatario>->zset member= <timestamp>:msf score=timestamp
                             # from timestamp int to date format -> datetime.datetime.fromtimestamp(timestamp_s).strftime('%d-%m-%Y %H:%M')
                             redis_client.zadd(f'chat:{username}:{list_of_contacts[contact_choice]}',{f'{timestamp}:{msg}':timestamp}) 
                             redis_client.zadd(f'user:contacts:{list_of_contacts[contact_choice]}',{username: timestamp})
+                        elif msg !='QuitChat' and redis_client.getbit('non_disturbare', redis_client.hget('utente_bit', list_of_contacts[contact_choice]))==1:
+                            print("Errore, l'utente selezionato è in modalità non disturbare. Non è pertanto raggiungibile fino a quando la modalità non disturbare sarà disattivata")
+                            time.sleep(3)
+                            break
                         else:
                             break
                 case 2:
@@ -171,7 +178,7 @@ def chatChoice_page(contact_choice):
                     pass
                 case 3:
                     delete_user_form_contacts(contact_choice)
-                    break   
+                    break
                 case 0:
                     break
     
@@ -189,20 +196,34 @@ def stamp_contacts():
     else:
         os.system('cls')
         print('fatti degli amici')
-        time.sleep(0.5)    
+        time.sleep(0.5)  
 
+def do_not_disturb(user, choice):
+    bit = redis_client.hget('utente_bit', user)
+    if choice==0 and redis_client.getbit('non_disturbare', bit)!=0:
+        redis_client.setbit('non_disturbare', bit, 0)
+    elif choice==1 and redis_client.getbit('non_disturbare', bit)!=1:
+        redis_client.setbit('non_disturbare', bit, 1)
+
+def assegnamento_utente_bit(username):
+    bit = 0
+    redis_client.hset('utente_bit', username, bit)
+    bit += 1
+            
 if __name__=='__main__':
     redis_client=start_client()
     ping_status = redis_client.ping()
         
     print("Ping successful:", ping_status)
+    if not redis_client.exists('non_disturbare'):
+        redis_client.set('non_disturbare', 0)
     username=first_page()
     if username!=False:
         list_of_contacts=[]
         while True:
             try:
-                os.system('cls')    
-                choice=int(input(f'<{username}>\n-1: Cerca utente\n-2: Visualizza contatti\n-0: Esci\n'))
+                os.system('cls')
+                choice=int(input(f'<{username}>\n-1: Cerca utente\n-2: Visualizza contatti\n-3: Modalità non disturbare\n-0: Esci\n'))
                 os.system('cls')
                 match choice:
                     case 1:
@@ -210,6 +231,24 @@ if __name__=='__main__':
                     case 2:  
                         stamp_contacts()
                         list_of_contacts=[]            
+                    case 3:
+                        while True:
+                            try:
+                                non_disturbare=int(input("-0: Disattiva la modalità non disturbare\n-1: Attiva la modalità non disturbare\n"))
+                                match non_disturbare:
+                                    case 0:
+                                        do_not_disturb(username, non_disturbare)
+                                        print('Modalità non disturbare disattivata con successo')
+                                    case 1:
+                                        do_not_disturb(username, non_disturbare)
+                                        print('Modalità non disturbare attivata con successo')
+                                    case _:
+                                        print('Scelta non disponibile')
+                                break 
+                            except ValueError as ve:
+                                print('Inserire un numero')
+                            except Exception as error:
+                                print(error)   
                     case 0:
                         break
                     case _:
