@@ -1,6 +1,6 @@
 import redis
 import time
-import datetime
+import datetime #datetime.datetime.fromtimestamp(timestamp_s).strftime('%d-%m-%Y %H:%M')
 import os
 
 def start_client():
@@ -190,7 +190,7 @@ def stamp_contacts():
         os.system('cls')
         print('fatti degli amici')
         time.sleep(0.5)    
-            
+
 if __name__=='__main__':
     redis_client=start_client()
     ping_status = redis_client.ping()
@@ -201,7 +201,7 @@ if __name__=='__main__':
         list_of_contacts=[]
         while True:
             try:
-                os.system('cls')
+                os.system('cls')    
                 choice=int(input(f'<{username}>\n-1: Cerca utente\n-2: Visualizza contatti\n-0: Esci\n'))
                 os.system('cls')
                 match choice:
