@@ -58,6 +58,7 @@ def sign_up():
         psw=str(input('Insert password: '))
         redis_client.set(f'user:name:{username}',username)
         redis_client.set(f'user:psw:{username}',psw)
+        #s.add('set', username)
         assegnamento_utente_bit(username)
         print('account cretated')
         time.sleep(1)    
@@ -206,9 +207,9 @@ def do_not_disturb(user, choice):
         redis_client.setbit('non_disturbare', bit, 1)
 
 def assegnamento_utente_bit(username):
-    bit = 0
+    bit = redis_client.get('user:indice_bitmap')
     redis_client.hset('utente_bit', username, bit)
-    bit += 1
+    redis_client.incr('user:indice_bitmap')
             
 if __name__=='__main__':
     redis_client=start_client()
@@ -217,6 +218,8 @@ if __name__=='__main__':
     print("Ping successful:", ping_status)
     if not redis_client.exists('non_disturbare'):
         redis_client.set('non_disturbare', 0)
+    if not redis_client.exists('user:indice_bitmap'):
+        redis_client.sadd('user:indice_bitmap')
     username=first_page()
     if username!=False:
         list_of_contacts=[]
