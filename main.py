@@ -147,34 +147,37 @@ def delete_user_form_contacts(contact_choice):
         case _:
             raise TypeError("Input non valido.")
 
-def chatChoice_page(contact_choice):
+def chatChoice_page(contact_choice, contacts):
     # Il fatto del -1 è perchè a schermo viene stampato con un +1 per una questione estetica   
     if contact_choice!=-1:
-        print(redis_client.getbit('non_disturbare', redis_client.hget('user:bit', list_of_contacts[contact_choice])))
-        print(type(redis_client.getbit('non_disturbare', redis_client.hget('user:bit', list_of_contacts[contact_choice]))))
-        while True:  
+        while True:
             os.system('cls')
-            chat_choice=int(input(f'<{list_of_contacts[contact_choice]}>\n-1: Chat\n-2: Chat a tempo\n-3: Cancella Contatto\n-0: Exit\n'))
+            chat_choice=int(input(f'<{contacts[contact_choice]}>\n-1: Chat\n-2: Chat a tempo\n-3: Cancella Contatto\n-0: Exit\n'))
             os.system('cls')
             match chat_choice:
                 case 1:
                     while True:
-                        chat_list = redis_client.zscan(name=f'chat:{username}:{list_of_contacts[contact_choice]}'
-                                                 , count=100)
-                        for chat in chat_list:
-                            timestamp_converted = datetime.datetime.fromtimestamp(chat[1]).strftime('%d-%m-%Y %H:%M')
-                            print(f'{timestamp_converted} - {chat[0]}\n')
+                        #stampa dei messaggi precedenti della chat
+
+                        if redis_client.exists(f'chat:{username}:{contacts[contact_choice]}'):
+                            cursor = 0
+                            chat_list = redis_client.zscan(cursor = cursor, name=f'chat:{username}:{contacts[contact_choice]}')
+                            chat_list = chat_list[1]
+                            print(chat_list)
+                            for chat in chat_list:
+                                chat = chat[0].split(':')
+                                print(f'{chat[1]}-{chat[2]}\n')
 
                         #  manca la visualizzazione dei messagi precedenti e la live chat
                         msg=str(input('   '*50+'Type: QuitChat\nScrivi: '))
-                        if msg !='QuitChat' and redis_client.getbit('user:dnd', redis_client.hget('user:bit', list_of_contacts[contact_choice]))==0:
+                        if msg !='QuitChat':
                             timestamp = int(time.time() * 1000)
                             msg_id=redis_client.get(f'chat:msgId:{username}')
                             # chat:<mittente>:<destinatario>->zset member= <timestamp>:msf score=timestamp
                             # from timestamp int to date format -> datetime.datetime.fromtimestamp(timestamp_s).strftime('%d-%m-%Y %H:%M')
-                            redis_client.zadd(f'chat:{username}:{list_of_contacts[contact_choice]}',{f'{timestamp} - inviato>:{msg}':timestamp})
-                            redis_client.zadd(f'chat:{list_of_contacts[contact_choice]}:{username}', {f'{timestamp} - ricevuto<:{msg}':timestamp})
-                        elif msg !='QuitChat' and redis_client.getbit('user:dnd', redis_client.hget('user:bit', list_of_contacts[contact_choice]))==1:
+                            redis_client.zadd(f'chat:{username}:{contacts[contact_choice]}',{f'{timestamp}:inviato>:{msg}':timestamp})
+                            redis_client.zadd(f'chat:{contacts[contact_choice]}:{username}', {f'{timestamp}:ricevuto<:{msg}':timestamp})
+                        elif msg !='QuitChat' :
                             print("Errore, l'utente selezionato è in modalità non disturbare. Non è pertanto raggiungibile fino a quando la modalità non disturbare sarà disattivata")
                             time.sleep(3)
                             break
@@ -192,14 +195,14 @@ def chatChoice_page(contact_choice):
 def stamp_contacts():
     # Stampa di tutti i contatti in ordine di Score (il timeStamp dell'ultimo messaggio)
     contacts=redis_client.zrangebyscore(f'user:contacts:{username}','-inf', '+inf')
-    for contact in contacts:
-        list_of_contacts.append(f'{contact}')
-    if len(list_of_contacts)>0:
-        for index in range(len(list_of_contacts)):
-            print(f'-{index+1}: {list_of_contacts[index]}')
+
+    if len(contacts)!=0:
+        for index, contact in enumerate(contacts):
+            print(f'-{index+1}: {contact}')
         print('-0: Exit\n')
-        contact_choice=int(input('Seleziona un contatto: '))-1
-        chatChoice_page(contact_choice)
+        contact_choice=int(input('Seleziona un contatto: '))
+        contact_choice -= 1
+        chatChoice_page(contact_choice, contacts)
     else:
         os.system('cls')
         print('fatti degli amici')
