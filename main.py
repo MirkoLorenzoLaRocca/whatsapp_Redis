@@ -150,8 +150,8 @@ def delete_user_form_contacts(contact_choice):
 def chatChoice_page(contact_choice):
     # Il fatto del -1 è perchè a schermo viene stampato con un +1 per una questione estetica   
     if contact_choice!=-1:
-        print(redis_client.getbit('non_disturbare', redis_client.hget('utente_bit', list_of_contacts[contact_choice])))
-        print(type(redis_client.getbit('non_disturbare', redis_client.hget('utente_bit', list_of_contacts[contact_choice]))))
+        print(redis_client.getbit('non_disturbare', redis_client.hget('user:bit', list_of_contacts[contact_choice])))
+        print(type(redis_client.getbit('non_disturbare', redis_client.hget('user:bit', list_of_contacts[contact_choice]))))
         while True:  
             os.system('cls')
             chat_choice=int(input(f'<{list_of_contacts[contact_choice]}>\n-1: Chat\n-2: Chat a tempo\n-3: Cancella Contatto\n-0: Exit\n'))
@@ -161,14 +161,14 @@ def chatChoice_page(contact_choice):
                     while True:
                         #  manca la visualizzazione dei messagi precedenti e la live chat
                         msg=str(input('   '*50+'Type: QuitChat\nScrivi: '))
-                        if msg !='QuitChat' and redis_client.getbit('non_disturbare', redis_client.hget('utente_bit', list_of_contacts[contact_choice]))==0:
+                        if msg !='QuitChat' and redis_client.getbit('user:dnd', redis_client.hget('user:bit', list_of_contacts[contact_choice]))==0:
                             timestamp = int(time.time() * 1000)
                             msg_id=redis_client.get(f'chat:msgId:{username}')
                             # chat:<mittente>:<destinatario>->zset member= <timestamp>:msf score=timestamp
                             # from timestamp int to date format -> datetime.datetime.fromtimestamp(timestamp_s).strftime('%d-%m-%Y %H:%M')
                             redis_client.zadd(f'chat:{username}:{list_of_contacts[contact_choice]}',{f'{timestamp}:{msg}':timestamp}) 
                             redis_client.zadd(f'user:contacts:{list_of_contacts[contact_choice]}',{username: timestamp})
-                        elif msg !='QuitChat' and redis_client.getbit('non_disturbare', redis_client.hget('utente_bit', list_of_contacts[contact_choice]))==1:
+                        elif msg !='QuitChat' and redis_client.getbit('user:dnd', redis_client.hget('user:bit', list_of_contacts[contact_choice]))==1:
                             print("Errore, l'utente selezionato è in modalità non disturbare. Non è pertanto raggiungibile fino a quando la modalità non disturbare sarà disattivata")
                             time.sleep(3)
                             break
@@ -200,15 +200,15 @@ def stamp_contacts():
         time.sleep(0.5)  
 
 def do_not_disturb(user, choice):
-    bit = redis_client.hget('utente_bit', user)
-    if choice==0 and redis_client.getbit('non_disturbare', bit)!=0:
-        redis_client.setbit('non_disturbare', bit, 0)
-    elif choice==1 and redis_client.getbit('non_disturbare', bit)!=1:
-        redis_client.setbit('non_disturbare', bit, 1)
+    bit = redis_client.hget('user:bit', user)
+    if choice==1 and redis_client.getbit('user:dnd', bit)!=0:
+        redis_client.setbit('user:dnd', bit, 0)
+    elif choice==2 and redis_client.getbit('user:dnd', bit)!=1:
+        redis_client.setbit('user:dnd', bit, 1)
 
 def assegnamento_utente_bit(username):
     bit = redis_client.get('user:indice_bitmap')
-    redis_client.hset('utente_bit', username, bit)
+    redis_client.hset('user:bit', username, bit)
     redis_client.incr('user:indice_bitmap')
             
 if __name__=='__main__':
@@ -216,10 +216,10 @@ if __name__=='__main__':
     ping_status = redis_client.ping()
         
     print("Ping successful:", ping_status)
-    if not redis_client.exists('non_disturbare'):
-        redis_client.set('non_disturbare', 0)
+    if not redis_client.exists('user:dnd'):
+        redis_client.setbit('user:dnd', 0, 0)
     if not redis_client.exists('user:indice_bitmap'):
-        redis_client.sadd('user:indice_bitmap')
+        redis_client.set('user:indice_bitmap', 0)
     username=first_page()
     if username!=False:
         list_of_contacts=[]
@@ -237,14 +237,16 @@ if __name__=='__main__':
                     case 3:
                         while True:
                             try:
-                                non_disturbare=int(input("-0: Disattiva la modalità non disturbare\n-1: Attiva la modalità non disturbare\n"))
-                                match non_disturbare:
-                                    case 0:
-                                        do_not_disturb(username, non_disturbare)
-                                        print('Modalità non disturbare disattivata con successo')
+                                choice_dnd=int(input("-1: Disattiva la modalità non disturbare\n-2: Attiva la modalità non disturbare\n-0: Esci\n"))
+                                match choice_dnd:
                                     case 1:
-                                        do_not_disturb(username, non_disturbare)
+                                        do_not_disturb(username, choice_dnd)
+                                        print('Modalità non disturbare disattivata con successo')
+                                    case 2:
+                                        do_not_disturb(username, choice_dnd)
                                         print('Modalità non disturbare attivata con successo')
+                                    case 0:
+                                        break
                                     case _:
                                         print('Scelta non disponibile')
                                 break 
