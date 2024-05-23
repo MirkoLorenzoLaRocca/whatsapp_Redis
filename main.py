@@ -159,6 +159,12 @@ def chatChoice_page(contact_choice):
             match chat_choice:
                 case 1:
                     while True:
+                        chat_list = redis_client.zscan(name=f'chat:{username}:{list_of_contacts[contact_choice]}'
+                                                 , count=100)
+                        for chat in chat_list:
+                            timestamp_converted = datetime.datetime.fromtimestamp(chat[1]).strftime('%d-%m-%Y %H:%M')
+                            print(f'{timestamp_converted} - {chat[0]}\n')
+
                         #  manca la visualizzazione dei messagi precedenti e la live chat
                         msg=str(input('   '*50+'Type: QuitChat\nScrivi: '))
                         if msg !='QuitChat' and redis_client.getbit('user:dnd', redis_client.hget('user:bit', list_of_contacts[contact_choice]))==0:
@@ -166,8 +172,8 @@ def chatChoice_page(contact_choice):
                             msg_id=redis_client.get(f'chat:msgId:{username}')
                             # chat:<mittente>:<destinatario>->zset member= <timestamp>:msf score=timestamp
                             # from timestamp int to date format -> datetime.datetime.fromtimestamp(timestamp_s).strftime('%d-%m-%Y %H:%M')
-                            redis_client.zadd(f'chat:{username}:{list_of_contacts[contact_choice]}',{f'{timestamp}:{msg}':timestamp}) 
-                            redis_client.zadd(f'user:contacts:{list_of_contacts[contact_choice]}',{username: timestamp})
+                            redis_client.zadd(f'chat:{username}:{list_of_contacts[contact_choice]}',{f'{timestamp} - inviato>:{msg}':timestamp})
+                            redis_client.zadd(f'chat:{list_of_contacts[contact_choice]}:{username}', {f'{timestamp} - ricevuto<:{msg}':timestamp})
                         elif msg !='QuitChat' and redis_client.getbit('user:dnd', redis_client.hget('user:bit', list_of_contacts[contact_choice]))==1:
                             print("Errore, l'utente selezionato è in modalità non disturbare. Non è pertanto raggiungibile fino a quando la modalità non disturbare sarà disattivata")
                             time.sleep(3)
