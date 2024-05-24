@@ -91,6 +91,7 @@ def stamp_user():
     list_of_users=[]
     # funzione per stampare gli user trovati e poi aggiungerne 1 alla propria lista contatti
     keys = redis_client.scan(match=f'user:name:{searched_user}*', count=100)
+    keys=keys[1]
     if not keys:
         print(f"No users found matching '{searched_user}'.")
         return []
@@ -170,7 +171,7 @@ def chatChoice_page(contact_choice, contacts):
                                     print(f'<{chat[2]}\n  {formatted_date}')
                         
                         #  manca la visualizzazione dei messagi precedenti e la live chat
-                       
+                        
                         if redis_client.getbit('user:dnd',redis_client.hget('user:bit', list_of_contacts[contact_choice]))==1: # Ti espelle dal cicliclo in qualsiasi caso senza neache passare dal if 
                             print("Errore, l'utente selezionato è in modalità non disturbare. Non è pertanto raggiungibile fino a quando la modalità non disturbare sarà disattivata")
                             time.sleep(3)
