@@ -149,8 +149,6 @@ def delete_user_form_contacts(contact_choice):
 def chatChoice_page(contact_choice, contacts):
     # Il fatto del -1 è perchè a schermo viene stampato con un +1 per una questione estetica   
     if contact_choice!=-1:
-        #print(redis_client.getbit('user:dnd', redis_client.hget('user:bit',list_of_contacts[contact_choice])))
-        #print(type(redis_client.getbit('user:dnd', redis_client.hget('user:bit', list_of_contacts[contact_choice]))))
         while True:
             os.system('cls')
             chat_choice=int(input(f'<{contacts[contact_choice]}>\n-1: Chat\n-2: Chat a tempo\n-3: Cancella Contatto\n-0: Exit\n'))
@@ -171,8 +169,8 @@ def chatChoice_page(contact_choice, contacts):
                                     print(f'<{chat[2]}\n  {formatted_date}')
                         
                         #  manca la visualizzazione dei messagi precedenti e la live chat
-                        
-                        if redis_client.getbit('user:dnd',redis_client.hget('user:bit', list_of_contacts[contact_choice]))==1: # Ti espelle dal cicliclo in qualsiasi caso senza neache passare dal if 
+                        bit_offset = redis_client.hget('user:bit', contacts[contact_choice])
+                        if redis_client.getbit('user:dnd',redis_client.hget('user:bit', contacts[contact_choice]))==1: # Ti espelle dal cicliclo in qualsiasi caso senza neache passare dal if 
                             print("Errore, l'utente selezionato è in modalità non disturbare. Non è pertanto raggiungibile fino a quando la modalità non disturbare sarà disattivata")
                             time.sleep(3)
                             break
@@ -275,3 +273,4 @@ if __name__=='__main__':
                 print(error)   
     else:
         print('close')
+        
