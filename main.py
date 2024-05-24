@@ -169,7 +169,6 @@ def chatChoice_page(contact_choice, contacts):
                                     print(f'<{chat[2]}\n  {formatted_date}')
                         
                         #  manca la visualizzazione dei messagi precedenti e la live chat
-                        bit_offset = redis_client.hget('user:bit', contacts[contact_choice])
                         if redis_client.getbit('user:dnd',redis_client.hget('user:bit', contacts[contact_choice]))==1: # Ti espelle dal cicliclo in qualsiasi caso senza neache passare dal if 
                             print("Errore, l'utente selezionato è in modalità non disturbare. Non è pertanto raggiungibile fino a quando la modalità non disturbare sarà disattivata")
                             time.sleep(3)
@@ -182,7 +181,7 @@ def chatChoice_page(contact_choice, contacts):
                             redis_client.zadd(f'chat:{username}:{contacts[contact_choice]}',{f'{timestamp}:inviato>:{msg}':timestamp})
                             redis_client.zadd(f'chat:{contacts[contact_choice]}:{username}', {f'{timestamp}:ricevuto<:{msg}':timestamp})
                         else:
-                            redis_client.set(f"user:{username}:lst_interaction",int(time.time())*10000)
+                            redis_client.set(f"user:lst_interaction:{username}",int(time.time())*10000)
                             break
                 case 2:
                     # Chat a tempo
@@ -221,12 +220,16 @@ def assegnamento_utente_bit(username):
     redis_client.hset('user:bit', username, bit)
     redis_client.incr('user:indice_bitmap')
     
-def check_new_message():
+def check_new_message(username):
     chats = redis_client.scan(match=f'chat:{username}:*')
+    chats=chats[1]
     for chat in chats:
         chat = chat.split(":")
-        if redis_client.zscore(f"chat:{username}:{chat[2]}") < redis_client.get(f"user:{username}:lst_interaction"):
-            print("Hai ricevuto un nuovo messaggio da", chat[2])
+        # errore, da capire cosa.
+        last_inte = int(redis_client.zrangebyscore(f"chat:{username}:{chat[2]}", '-inf', '+inf', withscores=True)[-1][1])
+        if last_inte < int(redis_client.get(f"user:lst_interaction:{username}")):
+            print("Hai ricevuto un nuovo messaggio da: ", chat[2], '\n')
+            time.sleep(3)
     return True
             
 if __name__=='__main__':
@@ -244,6 +247,7 @@ if __name__=='__main__':
         while True:
             try:
                 os.system('cls')
+                check_new_message(username)
                 choice=int(input(f'<{username}>\n-1: Cerca utente\n-2: Visualizza contatti\n-3: Modalità non disturbare\n-0: Esci\n'))
                 os.system('cls')
                 match choice:
