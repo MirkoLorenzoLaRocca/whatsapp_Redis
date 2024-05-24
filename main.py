@@ -2,7 +2,7 @@ import redis
 import time
 import datetime
 import os
-
+lst_msg = 0
 def start_client():
     """_summary_
     Returns:
@@ -182,6 +182,7 @@ def chatChoice_page(contact_choice, contacts):
                             redis_client.zadd(f'chat:{username}:{contacts[contact_choice]}',{f'{timestamp}:inviato>:{msg}':timestamp})
                             redis_client.zadd(f'chat:{contacts[contact_choice]}:{username}', {f'{timestamp}:ricevuto<:{msg}':timestamp})
                         else:
+                            redis_client.set(f"user:{username}:lst_interaction",int(time.time())*10000)
                             break
                 case 2:
                     # Chat a tempo
@@ -219,6 +220,14 @@ def assegnamento_utente_bit(username):
     bit = redis_client.get('user:indice_bitmap')
     redis_client.hset('user:bit', username, bit)
     redis_client.incr('user:indice_bitmap')
+    
+def check_new_message():
+    chats = redis_client.scan(match=f'chat:{username}:*')
+    for chat in chats:
+        chat = chat.split(":")
+        if redis_client.zscore(f"chat:{username}:{chat[2]}") < redis_client.get(f"user:{username}:lst_interaction"):
+            print("Hai ricevuto un nuovo messaggio da", chat[2])
+    return True
             
 if __name__=='__main__':
     redis_client=start_client()
