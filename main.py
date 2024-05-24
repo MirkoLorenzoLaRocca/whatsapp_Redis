@@ -146,6 +146,11 @@ def delete_user_form_contacts(contact_choice):
         case _:
             raise TypeError("Input non valido.")
 
+def crea_callback(msg, formatted_date):
+    def notifica_utente(message):
+        formattato = f'inviato>:{msg}:{formatted_date}'
+        print(formattato)
+    return notifica_utente
 
 def visualizza_chat(contacts, contact_choice):
     while True:
@@ -163,8 +168,9 @@ def visualizza_chat(contacts, contact_choice):
 
         #  manca la visualizzazione dei messagi precedenti e la live chat
         bit_offset = redis_client.hget('user:bit', contacts[contact_choice])
-        if redis_client.getbit('user:dnd', redis_client.hget('user:bit', contacts[
-            contact_choice])) == 1:  # Ti espelle dal cicliclo in qualsiasi caso senza neache passare dal if
+        if redis_client.getbit('user:dnd',
+                               redis_client.hget('user:bit', contacts[contact_choice])) == 1:
+            # Ti espelle dal cicliclo in qualsiasi caso senza neache passare dal if
             print("Errore, l'utente selezionato è in modalità non disturbare."
                   " Non è pertanto raggiungibile fino a quando la modalità non disturbare "
                   "sarà disattivata")
@@ -174,10 +180,18 @@ def visualizza_chat(contacts, contact_choice):
         if msg != 'QuitChat':
             timestamp = int(time.time() * 10000)
             # chat:<mittente>:<destinatario>->zset member= <timestamp>:msf score=timestamp
-            # from timestamp int to date format -> datetime.datetime.fromtimestamp(timestamp_s).strftime('%d-%m-%Y %H:%M')
-            redis_client.zadd(f'chat:{username}:{contacts[contact_choice]}', {f'{timestamp}:inviato>:{msg}': timestamp})
+            # from timestamp int to date format ->
+            # datetime.datetime.fromtimestamp(timestamp_s).strftime('%d-%m-%Y %H:%M')
+            redis_client.zadd(f'chat:{username}:{contacts[contact_choice]}',
+                              {f'{timestamp}:inviato>:{msg}': timestamp})
             redis_client.zadd(f'chat:{contacts[contact_choice]}:{username}',
                               {f'{timestamp}:ricevuto<:{msg}': timestamp})
+            callback = crea_callback(msg, formatted_date)
+            pubsub = redis_client.pubsub()
+            pubsub.psubscribe(**{f'chat:{username}:{contacts[contact_choice]}': callback})
+            redis_client.publish(f'chat:{username}:{contacts[contact_choice]}',
+                                 f'{msg}')
+            pubsub.run_in_thread(sleep_time=10)
         else:
             break
 
