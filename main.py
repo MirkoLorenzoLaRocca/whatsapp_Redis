@@ -22,10 +22,10 @@ def login():
     """
     login
     """
-    username=str(input('Insert username: ')).lower().strip()
+    username=str(input('Inserisci username: ')).lower().strip()
     check=redis_client.get(f'user:name:{username}')
     if username == check:
-        psw=str(input('Insert password: ')).strip()
+        psw=str(input('Inserisci password: ')).strip()
         checkPsw=redis_client.get(f'user:psw:{username}')
         if psw == checkPsw:
             os.system('cls')
@@ -34,13 +34,14 @@ def login():
             return username
         else:
             os.system('cls')
-            print('password is incorrect')
+            print('La password inserita non è corretta')
             time.sleep(1)
+            return first_page()
     else:
         os.system('cls')
-        print(f'{username} does not exist')
+        print(f'account {username} non trovato')
         time.sleep(1)
-        return False
+        return first_page()
             
 def sign_up():
     """
@@ -49,13 +50,13 @@ def sign_up():
     - user:psw:{username} -> password utente
     - chat:msgId:{username}-> id per rendere univoci i messaggi inviati
     """
-    username=str(input('Insert username: ')).lower().strip()
+    username=str(input('Inserisci username: ')).lower().strip()
     if redis_client.get(f'user:name:{username}')!=None:
         os.system('cls')
-        print(f'{username} already taken')
+        print(f'Username {username} non è disponibile')
         time.sleep(1)
     else:
-        psw=str(input('Insert password: '))
+        psw=str(input('Inserisci password: '))
         redis_client.set(f'user:name:{username}',username)
         redis_client.set(f'user:psw:{username}',psw)
         #s.add('set', username)
@@ -67,7 +68,7 @@ def first_page():
     while True:
         try:
             os.system('cls')
-            choice=int(input('-1: Login\n-2: Sign up\n-0: Exit\n'))
+            choice=int(input('-1: Login\n-2: Sign up\n-0: Esci\n'))
             os.system('cls')
             match choice:
                 case 1:
@@ -77,14 +78,13 @@ def first_page():
                 case 0:
                     return False
                 case _:
-                    
                     raise TypeError
                     
         except TypeError:       
-            print('inserisci correttante')                  
+            print('scelta non valida')
         except Exception as error:
             print(error)
-            
+
 def stamp_user():
     searched_user=str(input('Inserisci il nome da cercare: ')).lower().strip()
     os.system('cls')
@@ -93,12 +93,12 @@ def stamp_user():
     keys = redis_client.scan(match=f'user:name:{searched_user}*', count=100)
     keys=keys[1]
     if not keys:
-        print(f"No users found matching '{searched_user}'.")
+        print(f"Nessun utente '{searched_user}' trovato.")
         return []
     for key in keys:
         key_parts = key.split(':')
         list_of_users.append(key_parts[2])
-        
+
     # Eliminazione Utenti gia presenti nella lista conatti
     user_contacts = redis_client.zrange(f'user:contacts:{username}', 0, -1)
     unique_elements = [user for user in list_of_users if user not in user_contacts and user != username]
@@ -117,7 +117,7 @@ def add_contacts():
     list_of_user=stamp_user()
     # Aggiunta di un user alla lista contatti
     if len(list_of_user)!=0:
-        selected_user=int(input('Quale user vuoi selezionare: '))-1
+        selected_user=int(input('Inserisci indice utente da aggiungere agli amici: '))-1
         if selected_user!=-1:
             redis_client.zadd(f'user:contacts:{username}',{list_of_user[selected_user]:0})
             redis_client.zadd(f'user:contacts:{list_of_user[selected_user]}',{username:0})
@@ -128,7 +128,7 @@ def add_contacts():
 
 def delete_user_form_contacts(contact_choice):
     os.system('cls')
-    confirm=int(input('Se elimini il contatto verranno cancellati anche i messaggi\n-1: continua\n-0: Exit\n'))
+    confirm=int(input('Se elimini il contatto verranno cancellati anche i messaggi\n-1: continua\n-0: Indietro\n'))
     match confirm:
         case 1:
             contacts1 = f'user:contacts:{username}'
@@ -146,43 +146,51 @@ def delete_user_form_contacts(contact_choice):
         case _:
             raise TypeError("Input non valido.")
 
+
+def visualizza_chat(contacts, contact_choice):
+    while True:
+        # stampa dei messaggi precedenti della chat
+        if redis_client.exists(f'chat:{username}:{contacts[contact_choice]}'):
+            chat_list = redis_client.zscan(name=f'chat:{username}:{contacts[contact_choice]}')
+            chat_list = chat_list[1]
+            for chat in chat_list:
+                chat = chat[0].split(':')
+                formatted_date = datetime.datetime.fromtimestamp(int(chat[0]) / 10000).strftime('%d-%m-%Y %H:%M')
+                if chat[1] == 'inviato>':
+                    print('     ' * 8 + f'>{chat[2]}\n' + '     ' * 8 + f'  {formatted_date}')
+                else:
+                    print(f'<{chat[2]}\n  {formatted_date}')
+
+        #  manca la visualizzazione dei messagi precedenti e la live chat
+        bit_offset = redis_client.hget('user:bit', contacts[contact_choice])
+        if redis_client.getbit('user:dnd', redis_client.hget('user:bit', contacts[
+            contact_choice])) == 1:  # Ti espelle dal cicliclo in qualsiasi caso senza neache passare dal if
+            print("Errore, l'utente selezionato è in modalità non disturbare."
+                  " Non è pertanto raggiungibile fino a quando la modalità non disturbare "
+                  "sarà disattivata")
+            time.sleep(3)
+            break
+        msg = str(input('   ' * 30 + 'Type: QuitChat\nScrivi: '))
+        if msg != 'QuitChat':
+            timestamp = int(time.time() * 10000)
+            # chat:<mittente>:<destinatario>->zset member= <timestamp>:msf score=timestamp
+            # from timestamp int to date format -> datetime.datetime.fromtimestamp(timestamp_s).strftime('%d-%m-%Y %H:%M')
+            redis_client.zadd(f'chat:{username}:{contacts[contact_choice]}', {f'{timestamp}:inviato>:{msg}': timestamp})
+            redis_client.zadd(f'chat:{contacts[contact_choice]}:{username}',
+                              {f'{timestamp}:ricevuto<:{msg}': timestamp})
+        else:
+            break
+
 def chatChoice_page(contact_choice, contacts):
     # Il fatto del -1 è perchè a schermo viene stampato con un +1 per una questione estetica   
     if contact_choice!=-1:
         while True:
             os.system('cls')
-            chat_choice=int(input(f'<{contacts[contact_choice]}>\n-1: Chat\n-2: Chat a tempo\n-3: Cancella Contatto\n-0: Exit\n'))
+            chat_choice=int(input(f'<{contacts[contact_choice]}>\n-1: Chat\n-2: Chat a tempo\n-3: Cancella Contatto\n-0: Indietro\n'))
             os.system('cls')
             match chat_choice:
                 case 1:
-                    while True:
-                        #stampa dei messaggi precedenti della chat
-                        if redis_client.exists(f'chat:{username}:{contacts[contact_choice]}' ):
-                            chat_list = redis_client.zscan(name=f'chat:{username}:{contacts[contact_choice]}')
-                            chat_list = chat_list[1]
-                            for chat in chat_list:
-                                chat = chat[0].split(':')
-                                formatted_date = datetime.datetime.fromtimestamp(int(chat[0]) / 10000).strftime('%d-%m-%Y %H:%M')
-                                if chat[1]=='inviato>':
-                                    print('     '*8+f'>{chat[2]}\n'+'     '*8+f'  {formatted_date}')
-                                else:
-                                    print(f'<{chat[2]}\n  {formatted_date}')
-                        
-                        #  manca la visualizzazione dei messagi precedenti e la live chat
-                        bit_offset = redis_client.hget('user:bit', contacts[contact_choice])
-                        if redis_client.getbit('user:dnd',redis_client.hget('user:bit', contacts[contact_choice]))==1: # Ti espelle dal cicliclo in qualsiasi caso senza neache passare dal if 
-                            print("Errore, l'utente selezionato è in modalità non disturbare. Non è pertanto raggiungibile fino a quando la modalità non disturbare sarà disattivata")
-                            time.sleep(3)
-                            break
-                        msg=str(input('   '*30+'Type: QuitChat\nScrivi: '))
-                        if msg !='QuitChat':
-                            timestamp = int(time.time() * 10000)
-                            # chat:<mittente>:<destinatario>->zset member= <timestamp>:msf score=timestamp
-                            # from timestamp int to date format -> datetime.datetime.fromtimestamp(timestamp_s).strftime('%d-%m-%Y %H:%M')
-                            redis_client.zadd(f'chat:{username}:{contacts[contact_choice]}',{f'{timestamp}:inviato>:{msg}':timestamp})
-                            redis_client.zadd(f'chat:{contacts[contact_choice]}:{username}', {f'{timestamp}:ricevuto<:{msg}':timestamp})
-                        else:
-                            break
+                    visualizza_chat(contacts, contact_choice)
                 case 2:
                     # Chat a tempo
                     pass
@@ -219,11 +227,34 @@ def assegnamento_utente_bit(username):
     bit = redis_client.get('user:indice_bitmap')
     redis_client.hset('user:bit', username, bit)
     redis_client.incr('user:indice_bitmap')
-            
+
+
+def menu_non_disturbare():
+    while True:
+        try:
+            choice_dnd = int(
+                input("-1: Disattiva la modalità non disturbare\n-2: Attiva la modalità non disturbare\n-0: Esci\n"))
+            match choice_dnd:
+                case 1:
+                    do_not_disturb(username, choice_dnd)
+                    print('Modalità non disturbare disattivata con successo')
+                case 2:
+                    do_not_disturb(username, choice_dnd)
+                    print('Modalità non disturbare attivata con successo')
+                case 0:
+                    break
+                case _:
+                    print('Scelta non disponibile')
+            break
+        except ValueError as ve:
+            print('Inserire un numero')
+        except Exception as error:
+            print(error)
+
 if __name__=='__main__':
     redis_client=start_client()
     ping_status = redis_client.ping()
-        
+
     print("Ping successful:", ping_status)
     if not redis_client.exists('user:dnd'):
         redis_client.setbit('user:dnd', 0, 0)
@@ -244,25 +275,7 @@ if __name__=='__main__':
                         stamp_contacts()
                         list_of_contacts=[]            
                     case 3:
-                        while True:
-                            try:
-                                choice_dnd=int(input("-1: Disattiva la modalità non disturbare\n-2: Attiva la modalità non disturbare\n-0: Esci\n"))
-                                match choice_dnd:
-                                    case 1:
-                                        do_not_disturb(username, choice_dnd)
-                                        print('Modalità non disturbare disattivata con successo')
-                                    case 2:
-                                        do_not_disturb(username, choice_dnd)
-                                        print('Modalità non disturbare attivata con successo')
-                                    case 0:
-                                        break
-                                    case _:
-                                        print('Scelta non disponibile')
-                                break 
-                            except ValueError as ve:
-                                print('Inserire un numero')
-                            except Exception as error:
-                                print(error)   
+                        menu_non_disturbare()
                     case 0:
                         break
                     case _:
@@ -270,7 +283,8 @@ if __name__=='__main__':
             except ValueError as ve:
                 print('Azione impossibile')
             except Exception as error:
-                print(error)   
+                print(error)
+                break
     else:
         print('close')
         
