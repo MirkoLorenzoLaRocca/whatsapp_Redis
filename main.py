@@ -3,6 +3,7 @@ import time
 import datetime
 import os
 
+
 def start_client():
     """_summary_
     Returns:
@@ -146,52 +147,61 @@ def delete_user_form_contacts(contact_choice):
         case _:
             raise TypeError("Input non valido.")
 
-def crea_callback(msg, formatted_date):
-    def notifica_utente(message):
-        formattato = f'inviato>:{msg}:{formatted_date}'
-        print(formattato)
-    return notifica_utente
+def convert_date(date):
+    formatted_date=datetime.datetime.fromtimestamp(int(date) / 10000).strftime('%d-%m-%Y %H:%M')
+    return formatted_date
 
+def crea_callback(username, msg, formatted_date):
+    # formattato = f'inviato>:{msg}:{formatted_date}'
+    msg=msg.split(':')
+    check_username=msg[0]
+    msg=msg[1]
+    if check_username == username:
+        formattato='     ' * 8 + f'io>{msg}\n' + '     ' * 8 + f'  {formatted_date}'
+    else:
+        formattato=f'{check_username}<{msg}\n  {formatted_date}'
+    print(formattato)
+    return formattato
 def visualizza_chat(contacts, contact_choice):
-    while True:
-        # stampa dei messaggi precedenti della chat
-        if redis_client.exists(f'chat:{username}:{contacts[contact_choice]}'):
-            chat_list = redis_client.zscan(name=f'chat:{username}:{contacts[contact_choice]}')
-            chat_list = chat_list[1]
-            for chat in chat_list:
-                chat = chat[0].split(':')
-                formatted_date = datetime.datetime.fromtimestamp(int(chat[0]) / 10000).strftime('%d-%m-%Y %H:%M')
-                if chat[1] == 'inviato>':
-                    print('     ' * 8 + f'>{chat[2]}\n' + '     ' * 8 + f'  {formatted_date}')
-                else:
-                    print(f'<{chat[2]}\n  {formatted_date}')
 
-        #  manca la visualizzazione dei messagi precedenti e la live chat
-        bit_offset = redis_client.hget('user:bit', contacts[contact_choice])
+    key = [username, contacts[contact_choice]]
+    key.sort()
+    key = f'chat:{key[0]}:{key[1]}'
+    #controllo se la chat esiste e stampa dei messaggi precedenti
+    if redis_client.exists(key):
+        chat_list = redis_client.zscan(name=key)
+        chat_list = chat_list[1]
+        for chat in chat_list:
+            chat = chat[0].split(':')
+            #formatted_date = datetime.datetime.fromtimestamp(int(chat[0]) / 10000).strftime('%d-%m-%Y %H:%M')
+            formatted_date=convert_date(chat[0])
+            if chat[1] == username:
+                print('     ' * 8 + f'io>{chat[2]}\n' + '     ' * 8 + f'  {formatted_date}')
+            else:
+                print(f'{contacts[contact_choice]}<{chat[2]}\n  {formatted_date}')
+    while True:
+        #controllo se l'utente è in modalità non disturbare
         if redis_client.getbit('user:dnd',
                                redis_client.hget('user:bit', contacts[contact_choice])) == 1:
-            # Ti espelle dal cicliclo in qualsiasi caso senza neache passare dal if
             print("Errore, l'utente selezionato è in modalità non disturbare."
                   " Non è pertanto raggiungibile fino a quando la modalità non disturbare "
                   "sarà disattivata")
-            time.sleep(3)
+            time.sleep(2)
             break
-        msg = str(input('   ' * 30 + 'Type: QuitChat\nScrivi: '))
+        #richiesta del messaggio da scrivere
+        msg = str(input('Scrivi (QuitChat per uscire): '))
         if msg != 'QuitChat':
             timestamp = int(time.time() * 10000)
-            # chat:<mittente>:<destinatario>->zset member= <timestamp>:msf score=timestamp
-            # from timestamp int to date format ->
-            # datetime.datetime.fromtimestamp(timestamp_s).strftime('%d-%m-%Y %H:%M')
-            redis_client.zadd(f'chat:{username}:{contacts[contact_choice]}',
-                              {f'{timestamp}:inviato>:{msg}': timestamp})
-            redis_client.zadd(f'chat:{contacts[contact_choice]}:{username}',
-                              {f'{timestamp}:ricevuto<:{msg}': timestamp})
-            callback = crea_callback(msg, formatted_date)
+            #aggiunta messaggio db
+            redis_client.zadd(key,
+                              {f'{timestamp}:{username}:{msg}': timestamp})
+            #parte live chat
             pubsub = redis_client.pubsub()
-            pubsub.psubscribe(**{f'chat:{username}:{contacts[contact_choice]}': callback})
-            redis_client.publish(f'chat:{username}:{contacts[contact_choice]}',
-                                 f'{msg}')
-            pubsub.run_in_thread(sleep_time=10)
+            callback = crea_callback(username,f'{username}:{msg}', convert_date(timestamp))
+            pubsub.psubscribe(**{f'{key}': crea_callback})
+            redis_client.publish(f'{key}',f'{timestamp}:{username}:{msg}')
+            thread = pubsub.run_in_thread(sleep_time=0.1)
+            thread.stop()
         else:
             break
 
@@ -301,4 +311,4 @@ if __name__=='__main__':
                 break
     else:
         print('close')
-        
+
