@@ -2,6 +2,7 @@ import redis
 import time
 import datetime
 import os
+import colorama
 
 
 def start_client():
@@ -148,20 +149,23 @@ def delete_user_form_contacts(contact_choice):
             raise TypeError("Input non valido.")
 
 def convert_date(date):
-    formatted_date=datetime.datetime.fromtimestamp(int(date) / 10000).strftime('%d-%m-%Y %H:%M')
-    return formatted_date
+    return datetime.datetime.fromtimestamp(int(date) / 10000).strftime('%d-%m-%Y %H:%M')
 
-def crea_callback(username, msg, formatted_date):
-    # formattato = f'inviato>:{msg}:{formatted_date}'
-    msg=msg.split(':')
-    check_username=msg[0]
-    msg=msg[1]
-    if check_username == username:
-        formattato='     ' * 8 + f'io>{msg}\n' + '     ' * 8 + f'  {formatted_date}'
-    else:
-        formattato=f'{check_username}<{msg}\n  {formatted_date}'
-    print(formattato)
-    return formattato
+def crea_callback(username):
+    def callback(message):
+    #formattato = f'inviato>:{msg}:{formatted_date}'
+        data=message['data'].split(':')
+        formatted_date = convert_date(data[0])
+        check_username=data[1]
+        msg = data[2]
+
+        if check_username == username:
+            formattato='     ' * 8 + f'io>{msg}\n' + '     ' * 8 + f'  {formatted_date}'
+        else:
+            formattato=f'{check_username}<{msg}\n  {formatted_date}'
+        print(formattato)
+    return callback
+
 def visualizza_chat(contacts, contact_choice):
 
     key = [username, contacts[contact_choice]]
@@ -173,12 +177,17 @@ def visualizza_chat(contacts, contact_choice):
         chat_list = chat_list[1]
         for chat in chat_list:
             chat = chat[0].split(':')
-            #formatted_date = datetime.datetime.fromtimestamp(int(chat[0]) / 10000).strftime('%d-%m-%Y %H:%M')
             formatted_date=convert_date(chat[0])
             if chat[1] == username:
                 print('     ' * 8 + f'io>{chat[2]}\n' + '     ' * 8 + f'  {formatted_date}')
             else:
                 print(f'{contacts[contact_choice]}<{chat[2]}\n  {formatted_date}')
+
+    #creazione chat live
+    pubsub = redis_client.pubsub()
+    pubsub.psubscribe(**{f'{key}': crea_callback(username)})
+    thread = pubsub.run_in_thread(sleep_time=0.1)
+
     while True:
         #controllo se l'utente è in modalità non disturbare
         if redis_client.getbit('user:dnd',
@@ -188,22 +197,20 @@ def visualizza_chat(contacts, contact_choice):
                   "sarà disattivata")
             time.sleep(2)
             break
+
         #richiesta del messaggio da scrivere
         msg = str(input('Scrivi (QuitChat per uscire): '))
+        print ("\033[A                             \033[A")
+
         if msg != 'QuitChat':
+
             timestamp = int(time.time() * 10000)
             #aggiunta messaggio db
-            redis_client.zadd(key,
-                              {f'{timestamp}:{username}:{msg}': timestamp})
-            #parte live chat
-            pubsub = redis_client.pubsub()
-            callback = crea_callback(username,f'{username}:{msg}', convert_date(timestamp))
-            pubsub.psubscribe(**{f'{key}': crea_callback})
+            redis_client.zadd(key,{f'{timestamp}:{username}:{msg}': timestamp})
             redis_client.publish(f'{key}',f'{timestamp}:{username}:{msg}')
-            thread = pubsub.run_in_thread(sleep_time=0.1)
-            thread.stop()
         else:
             break
+    thread.stop()
 
 def chatChoice_page(contact_choice, contacts):
     # Il fatto del -1 è perchè a schermo viene stampato con un +1 per una questione estetica   
