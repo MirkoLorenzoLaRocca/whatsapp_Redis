@@ -153,7 +153,6 @@ def convert_date(date):
 
 def crea_callback(username):
     def callback(message):
-    #formattato = f'inviato>:{msg}:{formatted_date}'
         data=message['data'].split(':')
         formatted_date = convert_date(data[0])
         check_username=data[1]
