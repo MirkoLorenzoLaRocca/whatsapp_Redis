@@ -181,7 +181,9 @@ def chatChoice_page(contact_choice, contacts):
                             redis_client.zadd(f'chat:{username}:{contacts[contact_choice]}',{f'{timestamp}:inviato>:{msg}':timestamp})
                             redis_client.zadd(f'chat:{contacts[contact_choice]}:{username}', {f'{timestamp}:ricevuto<:{msg}':timestamp})
                         else:
-                            redis_client.set(f"user:lst_interaction:{username}",int(time.time())*10000)
+                            time.sleep(1)
+                            lst_inte_timestamp = int(time.time())*10000
+                            redis_client.set(f"user:lst_interaction:{username}",lst_inte_timestamp)
                             break
                 case 2:
                     # Chat a tempo
@@ -226,8 +228,11 @@ def check_new_message(username):
     for chat in chats:
         chat = chat.split(":")
         # errore, da capire cosa.
-        last_inte = int(redis_client.zrangebyscore(f"chat:{username}:{chat[2]}", '-inf', '+inf', withscores=True)[-1][1])
-        if last_inte < int(redis_client.get(f"user:lst_interaction:{username}")):
+        lst_msg = int(redis_client.zrangebyscore(f"chat:{username}:{chat[2]}", '-inf', '+inf', withscores=True)[-1][1])
+        last_inte = int(redis_client.get(f"user:lst_interaction:{username}"))
+        if not redis_client.exists(f"user:lst_interaction:{username}"):
+            print("Hai ricevuto un nuovo messaggio da: ", chat[2], '\n')
+        elif last_inte < lst_msg:
             print("Hai ricevuto un nuovo messaggio da: ", chat[2], '\n')
             time.sleep(3)
     return True
