@@ -7,7 +7,6 @@ from colorama import Fore, Back, init, Style
 
 init(autoreset=True)
 
-
 def start_client():
     """
     avvio e configurazione del client redis.
@@ -26,7 +25,6 @@ def start_client():
     if not redis_client.exists('user:indice_bitmap'):
         redis_client.set('user:indice_bitmap', 0)
     return redis_client
-
 
 def login():
     """
@@ -53,7 +51,6 @@ def login():
         time.sleep(1)
         return menu_accesso()
 
-
 def sign_up():
     """
     Registrazione utente con la creazione delle chiavi:
@@ -74,7 +71,6 @@ def sign_up():
         assegnamento_utente_bit(username)
         print('Account creato correttamente')
         time.sleep(1)
-
 
 def menu_accesso():
     while True:
@@ -97,7 +93,6 @@ def menu_accesso():
             print('scelta non valida')
         except Exception as error:
             print(error)
-
 
 def cerca_account():
     # ricerca degli utenti nel database di redis e visualizzazione a schermo
@@ -128,7 +123,6 @@ def cerca_account():
         user_contacts = []
         return []
 
-
 def aggiungi_contatto():
     list_of_user = cerca_account()
     # Aggiunta di un user alla lista contatti
@@ -141,7 +135,6 @@ def aggiungi_contatto():
             print('Exit')
     else:
         time.sleep(1)
-
 
 def elimina_contatto(contact_choice, contacts):
     os.system('cls')
@@ -169,10 +162,8 @@ def elimina_contatto(contact_choice, contacts):
         case _:
             raise TypeError("Input non valido.")
 
-
 def convert_date(date):
     return datetime.datetime.fromtimestamp(int(date) / 10000).strftime('%d-%m-%Y %H:%M')
-
 
 def crea_callback(username):
     def callback(message):
@@ -307,7 +298,6 @@ def visualizza_chat(contacts, contact_choice):
             break
     thread.stop()
 
-
 def chatChoice_page(contact_choice, contacts):
     # Il fatto del -1 è perchè a schermo viene stampato con un +1 per una questione estetica   
     if contact_choice != -1:
@@ -331,7 +321,6 @@ def chatChoice_page(contact_choice, contacts):
                 case 0:
                     break
 
-
 def visualizza_contatti():
     # Stampa di tutti i contatti in ordine di Score (il timeStamp dell'ultimo messaggio)
     contacts = redis_client.zrangebyscore(f'user:contacts:{username}', '-inf', '+inf')
@@ -348,7 +337,6 @@ def visualizza_contatti():
         print('fatti degli amici')
         time.sleep(0.5)
 
-
 def do_not_disturb(user, choice):
     bit = redis_client.hget('user:bit', user)
     if choice == 1 and redis_client.getbit('user:dnd', bit) != 0:
@@ -356,12 +344,10 @@ def do_not_disturb(user, choice):
     elif choice == 2 and redis_client.getbit('user:dnd', bit) != 1:
         redis_client.setbit('user:dnd', bit, 1)
 
-
 def assegnamento_utente_bit(username):
     bit = redis_client.get('user:indice_bitmap')
     redis_client.hset('user:bit', username, bit)
     redis_client.incr('user:indice_bitmap')
-
 
 def menu_non_disturbare():
     while True:
@@ -384,7 +370,6 @@ def menu_non_disturbare():
             print('Inserire un numero')
         except Exception as error:
             print(error)
-
 
 def menu_principale(user):
     while True:
@@ -415,15 +400,16 @@ def menu_principale(user):
             print(error)
             break
 
-
 if __name__ == '__main__':
     redis_client = start_client()
     ping_status = redis_client.ping()
-
     print("Ping successful:", ping_status)
-    username = menu_accesso()
-    if username != False:
-        list_of_contacts = []
-        menu_principale(username)
-    else:
-        print('close')
+    while True:
+        username = menu_accesso()
+        if username != False:
+            list_of_contacts = []
+            menu_principale(username)
+        else:
+            print('close')
+            break
+            
