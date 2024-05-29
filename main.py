@@ -77,7 +77,7 @@ def menu_accesso():
         try:
             os.system('cls')
             choice = int(input(Fore.GREEN + '-1: Login\n-2: Sign up\n' + Fore.RED +
-                               '-0: Esci\n' + Style.RESET_ALL))
+                            '-0: Esci\n' + Style.RESET_ALL))
             os.system('cls')
             match choice:
                 case 1:
@@ -174,7 +174,7 @@ def crea_callback(username):
 
         if check_username == username:
             formattato = (Fore.LIGHTGREEN_EX + '     ' * 8 + f'io>{msg}\n' + '     ' * 8 +
-                          Style.RESET_ALL + f'{formatted_date}')
+                        Style.RESET_ALL + f'{formatted_date}')
         else:
             formattato = f'{check_username}<{msg}\n  {formatted_date}'
         
@@ -274,10 +274,10 @@ def visualizza_chat(contacts, contact_choice):
     while True:
         # controllo se l'utente è in modalità non disturbare
         if redis_client.getbit('user:dnd',
-                               redis_client.hget('user:bit', contacts[contact_choice])) == 1:
+                            redis_client.hget('user:bit', contacts[contact_choice])) == 1:
             print("L'utente selezionato è in modalità non disturbare."
-                  " Non è pertanto raggiungibile fino a quando la modalità non disturbare "
-                  "sarà disattivata")
+                " Non è pertanto raggiungibile fino a quando la modalità non disturbare "
+                "sarà disattivata")
             time.sleep(2)
             break
 
@@ -295,6 +295,8 @@ def visualizza_chat(contacts, contact_choice):
             redis_client.zadd(f'user:contacts:{username}',{contacts[contact_choice]: timestamp*-1})
             redis_client.zadd(f'user:contacts:{contacts[contact_choice]}',{username : timestamp*-1})
         else:
+            lst_inte_timestamp = int(time.time())*10000
+            redis_client.set(f"user:lst_interaction:{username}",lst_inte_timestamp)
             break
     thread.stop()
 
@@ -375,6 +377,7 @@ def menu_principale(user):
     while True:
         try:
             os.system('cls')
+            check_new_message(username)
             choice = int(input(
                 f'< {user.upper()} >'
                 f'\n-1: Cerca utente\n'
@@ -399,6 +402,20 @@ def menu_principale(user):
         except Exception as error:
             print(error)
             break
+        
+def check_new_message(username):
+    chats = redis_client.scan(match=f'chat:{username}:*')
+    chats=chats[1]
+    for chat in chats:
+        chat = chat.split(":")
+        lst_msg = int(redis_client.zrangebyscore(f"chat:{username}:{chat[2]}", '-inf', '+inf', withscores=True)[-1][1])
+        last_inte = int(redis_client.get(f"user:lst_interaction:{username}"))
+        if not redis_client.exists(f"user:lst_interaction:{username}"):
+            print("Hai ricevuto un nuovo messaggio da: ", chat[2], '\n')
+        elif last_inte < lst_msg:
+            print("Hai ricevuto un nuovo messaggio da: ", chat[2], '\n')
+            time.sleep(3)
+    return True
 
 if __name__ == '__main__':
     redis_client = start_client()
