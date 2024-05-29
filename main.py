@@ -2,6 +2,7 @@ import redis
 import time
 import datetime
 import os
+import threading
 from colorama import Fore, Back, init, Style
 
 init(autoreset=True)
@@ -51,8 +52,8 @@ def login():
         print(f'account {username} non trovato')
         time.sleep(1)
         return menu_accesso()
-
-
+    
+    
 def sign_up():
     """
     Registrazione utente con la creazione delle chiavi:
@@ -193,25 +194,90 @@ def crea_callback(username):
 
     return callback
 
-
-def visualizza_chat(contacts, contact_choice):
-    key = [username, contacts[contact_choice]]
-    key.sort()
-    key = f'chat:{key[0]}:{key[1]}'
-    # controllo se la chat esiste e stampa dei messaggi precedenti
-    if redis_client.exists(key):
-        chat_list = redis_client.zscan(name=key)
-        chat_list = chat_list[1]
-        for chat in chat_list:
-            chat = chat[0].split(':')
-            formatted_date = convert_date(chat[0])
-            if chat[1] == username:
+def stampa_messeggi_precedenti(key,contacts, contact_choice):
+    chat_list = redis_client.zscan(name=key)
+    chat_list = chat_list[1]
+    for chat in chat_list:
+        chat = chat[0].split(':')
+        formatted_date = convert_date(chat[0])
+        if chat[1] == username:
                 print('     ' * 8 + Back.GREEN + Fore.BLACK + f' io> {chat[2]} ' +
                       Style.RESET_ALL + '\n' + '     ' * 8 + f'  {formatted_date}')
             else:
                 print(Back.WHITE + Fore.BLACK + f' {contacts[contact_choice]}< ' + f'{chat[2]} '
                       + Style.RESET_ALL + f'\n  {formatted_date}')
 
+def visualizza_chat_temp(contacts, contact_choice):
+    stop_event = threading.Event()
+
+    def timer_function():
+        while not stop_event.is_set():
+            time.sleep(wait_time)
+            if not stop_event.is_set():
+                stop_event.set()
+
+    key = [username, contacts[contact_choice]]
+    key.sort()
+    key = f'chat:temp:{key[0]}:{key[1]}'
+
+    # controllo se la chat esiste e stampa dei messaggi precedenti
+    if redis_client.exists(key):
+        stampa_messeggi_precedenti(key, contacts, contact_choice)
+    
+    # creazione chat live
+    pubsub = redis_client.pubsub()
+    pubsub.psubscribe(**{f'{key}': crea_callback(username)})
+    thread = pubsub.run_in_thread(sleep_time=0.01)
+    
+    # set chat temporanea
+    wait_time = 300
+    redis_client.expire(key, wait_time)
+
+    # Creazione e avvio del thread del timer
+    timer_thread = threading.Thread(target=timer_function)
+    timer_thread.start()
+
+    while True:
+        # controllo se l'utente è in modalità non disturbare
+        if redis_client.getbit('user:dnd', redis_client.hget('user:bit', contacts[contact_choice])) == 1:
+            print("Errore, l'utente selezionato è in modalità non disturbare. "
+                    "Non è pertanto raggiungibile fino a quando la modalità non disturbare "
+                    "sarà disattivata")
+            time.sleep(2)
+            break
+        
+        # richiesta del messaggio da scrivere
+        msg = input(Style.DIM + 'Scrivi' + Fore.RED + '(QuitChat per uscire): ' + Style.RESET_ALL)
+        print("\033[A                             \033[A")
+        
+        if stop_event.is_set():
+            stop_event.set()
+            timer_thread.join()
+            os.system('cls')
+            print('Il tempo è scaduto')
+            time.sleep(2)
+            break
+        
+        if msg != 'QuitChat':
+            timestamp = int(time.time() * 10000)
+            # aggiornamento TTL
+            wait_time = 300
+            redis_client.expire(key, wait_time)
+            # aggiunta messaggio db
+            redis_client.zadd(key, {f'{timestamp}:{username}:{msg}': timestamp})
+            redis_client.publish(f'{key}', f'{timestamp}:{username}:{msg}')
+        else:
+            stop_event.set()
+            break
+    thread.stop()
+    
+def visualizza_chat(contacts, contact_choice):
+    key = [username, contacts[contact_choice]]
+    key.sort()
+    key = f'chat:{key[0]}:{key[1]}'
+    # controllo se la chat esiste e stampa dei messaggi precedenti
+    if redis_client.exists(key):
+        stampa_messeggi_precedenti(key,contacts, contact_choice)
     # creazione chat live
     pubsub = redis_client.pubsub()
     pubsub.psubscribe(**{f'{key}': crea_callback(username)})
@@ -224,7 +290,7 @@ def visualizza_chat(contacts, contact_choice):
         # controllo se l'utente è in modalità non disturbare
         if redis_client.getbit('user:dnd',
                                redis_client.hget('user:bit', contacts[contact_choice])) == 1:
-            print(Fore.RED + "Errore, l'utente selezionato è in modalità non disturbare.\n"
+            print(Fore.RED + "L'utente selezionato è in modalità non disturbare.\n"
                              " Non è pertanto raggiungibile fino a quando la modalità non disturbare non"
                              "sarà disattivata" + Style.RESET_ALL)
             time.sleep(2)
@@ -239,7 +305,12 @@ def visualizza_chat(contacts, contact_choice):
             # aggiunta messaggio db
             redis_client.zadd(key, {f'{timestamp}:{username}:{msg}': timestamp})
             redis_client.publish(f'{key}', f'{timestamp}:{username}:{msg}')
+            # aggiornamento della lista contatti per averli nell'ordine dell'ultima persona che hai/ti ha contattato
+            redis_client.zadd(f'user:contacts:{username}',{contacts[contact_choice]: timestamp*-1})
+            redis_client.zadd(f'user:contacts:{contacts[contact_choice]}',{username : timestamp*-1})
         else:
+            lst_inte_timestamp = int(time.time())*10000
+            redis_client.set(f"user:lst_interaction:{username}",lst_inte_timestamp)
             break
     thread.stop()
 
@@ -260,8 +331,7 @@ def chatChoice_page(contact_choice, contacts):
                 case 1:
                     visualizza_chat(contacts, contact_choice)
                 case 2:
-                    # Chat a tempo
-                    pass
+                    visualizza_chat_temp(contacts, contact_choice)
                 case 3:
                     elimina_contatto(contact_choice, contacts)
                     break
@@ -331,6 +401,7 @@ def menu_principale(user):
     while True:
         try:
             os.system('cls')
+            check_new_message(username)
             choice = int(input(
                 f'< {user.upper()} >'
                 f'\n-1: Cerca utente\n'
@@ -356,15 +427,29 @@ def menu_principale(user):
             print(error)
             break
 
+def check_new_message(username):
+    chats = redis_client.scan(match=f'chat:{username}:*')
+    chats=chats[1]
+    for chat in chats:
+        chat = chat.split(":")
+        lst_msg = int(redis_client.zrangebyscore(f"chat:{username}:{chat[2]}", '-inf', '+inf', withscores=True)[-1][1])
+        last_inte = int(redis_client.get(f"user:lst_interaction:{username}"))
+        if not redis_client.exists(f"user:lst_interaction:{username}"):
+            print("Hai ricevuto un nuovo messaggio da: ", chat[2], '\n')
+        elif last_inte < lst_msg:
+            print("Hai ricevuto un nuovo messaggio da: ", chat[2], '\n')
+            time.sleep(3)
+    return True
 
 if __name__ == '__main__':
     redis_client = start_client()
     ping_status = redis_client.ping()
-
     print("Ping successful:", ping_status)
-    username = menu_accesso()
-    if username != False:
-        list_of_contacts = []
-        menu_principale(username)
-    else:
-        print('close')
+    while True:
+        username = menu_accesso()
+        if username != False:
+            list_of_contacts = []
+            menu_principale(username)
+        else:
+            print('close')
+            break
