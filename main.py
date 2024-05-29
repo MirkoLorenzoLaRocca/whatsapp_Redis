@@ -300,6 +300,9 @@ def visualizza_chat(contacts, contact_choice):
             # aggiunta messaggio db
             redis_client.zadd(key, {f'{timestamp}:{username}:{msg}': timestamp})
             redis_client.publish(f'{key}', f'{timestamp}:{username}:{msg}')
+            # aggiornamento della lista contatti per averli nell'ordine dell'ultima persona che hai/ti ha contattato
+            redis_client.zadd(f'user:contacts:{username}',{contacts[contact_choice]: timestamp*-1})
+            redis_client.zadd(f'user:contacts:{contacts[contact_choice]}',{username : timestamp*-1})
         else:
             break
     thread.stop()
