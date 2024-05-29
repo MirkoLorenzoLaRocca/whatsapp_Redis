@@ -79,8 +79,8 @@ def menu_accesso():
     while True:
         try:
             os.system('cls')
-            choice = int(input(Fore.GREEN + '-1: Login\n-2: Sign up\n' + Fore.RED +
-                               '-0: Esci\n' + Style.RESET_ALL))
+            choice = int(input('-1: Login\n-2: Sign up\n'
+                               '-0:' + Fore.RED + ' Esci\n' + Style.RESET_ALL))
             os.system('cls')
             match choice:
                 case 1:
@@ -165,6 +165,7 @@ def elimina_contatto(contact_choice, contacts):
                 print(Fore.RED + "Errore nell'eliminazione della chat" + Style.RESET_ALL)
         case 0:
             print('Operazione annullata.')
+            time.sleep(2)
         case _:
             raise TypeError("Input non valido.")
 
@@ -181,10 +182,13 @@ def crea_callback(username):
         msg = data[2]
 
         if check_username == username:
-            formattato = (Fore.LIGHTGREEN_EX + '     ' * 8 + f'io>{msg}\n' + '     ' * 8 +
-                          Style.RESET_ALL + f'{formatted_date}')
+            formattato = ('     ' * 8 +
+                          Back.GREEN + Fore.BLACK + f' io> {msg} ' + Style.RESET_ALL + '\n' +
+                          '     ' * 8 + f'{formatted_date}')
         else:
-            formattato = f'{check_username}<{msg}\n  {formatted_date}'
+            formattato = (Back.WHITE + Fore.BLACK +
+                          f' {check_username}< {msg} ' + Style.RESET_ALL
+                          + '\n' + f'{formatted_date}')
         print(formattato)
 
     return callback
@@ -202,32 +206,34 @@ def visualizza_chat(contacts, contact_choice):
             chat = chat[0].split(':')
             formatted_date = convert_date(chat[0])
             if chat[1] == username:
-                print(
-                    Fore.LIGHTGREEN_EX + '     ' * 8 + f'io>{chat[2]}\n' + '     ' * 8
-                    +Style.RESET_ALL + f'  {formatted_date}')
+                print('     ' * 8 + Back.GREEN + Fore.BLACK + f' io> {chat[2]} ' +
+                      Style.RESET_ALL + '\n' + '     ' * 8 + f'  {formatted_date}')
             else:
-                print(f'{contacts[contact_choice]}<{chat[2]}\n  {formatted_date}' + Style.RESET_ALL)
+                print(Back.WHITE + Fore.BLACK + f' {contacts[contact_choice]}< ' + f'{chat[2]} '
+                      + Style.RESET_ALL + f'\n  {formatted_date}')
 
     # creazione chat live
     pubsub = redis_client.pubsub()
     pubsub.psubscribe(**{f'{key}': crea_callback(username)})
     thread = pubsub.run_in_thread(sleep_time=0.01)
 
+    print(Style.DIM + 'Scrivi ' + Fore.RED + '(spazio per uscire)' + Style.RESET_ALL + ': ')
+    time.sleep(3)
+    print("\033[A                             \033[A")
     while True:
         # controllo se l'utente è in modalità non disturbare
         if redis_client.getbit('user:dnd',
                                redis_client.hget('user:bit', contacts[contact_choice])) == 1:
-            print("Errore, l'utente selezionato è in modalità non disturbare."
-                  " Non è pertanto raggiungibile fino a quando la modalità non disturbare "
-                  "sarà disattivata")
+            print(Fore.RED + "Errore, l'utente selezionato è in modalità non disturbare.\n"
+                             " Non è pertanto raggiungibile fino a quando la modalità non disturbare non"
+                             "sarà disattivata" + Style.RESET_ALL)
             time.sleep(2)
             break
 
         # richiesta del messaggio da scrivere
-        msg = str(input(Style.DIM + 'Scrivi' + Fore.RED + '(QuitChat per uscire): ' + Style.RESET_ALL))
+        msg = str(input(''))
         print("\033[A                             \033[A")
-
-        if msg != 'QuitChat':
+        if msg != '':
 
             timestamp = int(time.time() * 10000)
             # aggiunta messaggio db
@@ -247,8 +253,8 @@ def chatChoice_page(contact_choice, contacts):
                 f'< {contacts[contact_choice].upper()} >\n'
                 f'-1: Chat\n'
                 f'-2: Chat a tempo\n'
-                f'-3: Cancella Contatto\n' + Fore.RED +
-                f'-0: Indietro\n' + Style.RESET_ALL))
+                f'-3: Cancella Contatto\n'
+                f'-0: ' + Fore.RED + 'Indietro\n' + Style.RESET_ALL))
             os.system('cls')
             match chat_choice:
                 case 1:
@@ -298,7 +304,9 @@ def menu_non_disturbare():
     while True:
         try:
             choice_dnd = int(
-                input("-1: Disattiva la modalità non disturbare\n-2: Attiva la modalità non disturbare\n-0: Esci\n"))
+                input("-1: Disattiva la modalità non disturbare\n"
+                      "-2: Attiva la modalità non disturbare\n"
+                      "-0: " + Fore.RED + "Indietro\n" + Style.RESET_ALL))
             match choice_dnd:
                 case 1:
                     do_not_disturb(username, choice_dnd)
@@ -310,9 +318,11 @@ def menu_non_disturbare():
                     break
                 case _:
                     print('Scelta non disponibile')
+                    time.sleep(1)
             break
         except ValueError as ve:
             print('Inserire un numero')
+            time.sleep(1)
         except Exception as error:
             print(error)
 
@@ -325,8 +335,8 @@ def menu_principale(user):
                 f'< {user.upper()} >'
                 f'\n-1: Cerca utente\n'
                 f'-2: Visualizza contatti\n'
-                f'-3: Modalità non disturbare\n' + Fore.RED +
-                f'-0: Esci\n' + Style.RESET_ALL))
+                f'-3: Modalità non disturbare\n'
+                f'-0: ' + Fore.RED + 'Esci\n' + Style.RESET_ALL))
             os.system('cls')
 
             match choice:
