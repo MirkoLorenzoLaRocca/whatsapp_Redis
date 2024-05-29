@@ -72,6 +72,7 @@ def sign_up():
         redis_client.set(f'user:psw:{username}', psw)
         # s.add('set', username)
         assegnamento_utente_bit(username)
+        redis_client.set(f"user:lst_interaction:{username}",0)
         print('Account creato correttamente')
         time.sleep(1)
 
@@ -201,11 +202,11 @@ def stampa_messeggi_precedenti(key,contacts, contact_choice):
         chat = chat[0].split(':')
         formatted_date = convert_date(chat[0])
         if chat[1] == username:
-                print('     ' * 8 + Back.GREEN + Fore.BLACK + f' io> {chat[2]} ' +
-                      Style.RESET_ALL + '\n' + '     ' * 8 + f'  {formatted_date}')
-            else:
-                print(Back.WHITE + Fore.BLACK + f' {contacts[contact_choice]}< ' + f'{chat[2]} '
-                      + Style.RESET_ALL + f'\n  {formatted_date}')
+          print('     ' * 8 + Back.GREEN + Fore.BLACK + f' io> {chat[2]} ' +
+                 Style.RESET_ALL + '\n' + '     ' * 8 + f'  {formatted_date}')
+        else:
+          print(Back.WHITE + Fore.BLACK + f' {contacts[contact_choice]}< ' + f'{chat[2]} '
+                + Style.RESET_ALL + f'\n  {formatted_date}')
 
 def visualizza_chat_temp(contacts, contact_choice):
     stop_event = threading.Event()
@@ -342,7 +343,6 @@ def chatChoice_page(contact_choice, contacts):
 def visualizza_contatti():
     # Stampa di tutti i contatti in ordine di Score (il timeStamp dell'ultimo messaggio)
     contacts = redis_client.zrangebyscore(f'user:contacts:{username}', '-inf', '+inf')
-
     if len(contacts) != 0:
         for index, contact in enumerate(contacts):
             print(f'-{index + 1}: {contact}')
@@ -401,10 +401,10 @@ def menu_principale(user):
     while True:
         try:
             os.system('cls')
-            check_new_message(username)
+            print(f'< {user.upper()} >')
+            check_new_message(user)
             choice = int(input(
-                f'< {user.upper()} >'
-                f'\n-1: Cerca utente\n'
+                f'-1: Cerca utente\n'
                 f'-2: Visualizza contatti\n'
                 f'-3: Modalità non disturbare\n'
                 f'-0: ' + Fore.RED + 'Esci\n' + Style.RESET_ALL))
@@ -418,7 +418,8 @@ def menu_principale(user):
                 case 3:
                     menu_non_disturbare()
                 case 0:
-                    return menu_accesso()
+                    username=menu_accesso()
+                    return username
                 case _:
                     raise ValueError
         except ValueError as ve:
@@ -428,28 +429,43 @@ def menu_principale(user):
             break
 
 def check_new_message(username):
-    chats = redis_client.scan(match=f'chat:{username}:*')
-    chats=chats[1]
-    for chat in chats:
+    chats_1 = redis_client.scan(match=f'chat:{username}:*')
+    chats_1 = chats_1[1]
+    chats_2 = redis_client.scan(match=f'chat:*:{username}')
+    chats_2 = chats_2[1]
+    
+    for chat in chats_1:
         chat = chat.split(":")
         lst_msg = int(redis_client.zrangebyscore(f"chat:{username}:{chat[2]}", '-inf', '+inf', withscores=True)[-1][1])
         last_inte = int(redis_client.get(f"user:lst_interaction:{username}"))
         if not redis_client.exists(f"user:lst_interaction:{username}"):
-            print("Hai ricevuto un nuovo messaggio da: ", chat[2], '\n')
+            print(Fore.LIGHTYELLOW_EX +"Hai ricevuto un nuovo messaggio da:", chat[2])
         elif last_inte < lst_msg:
-            print("Hai ricevuto un nuovo messaggio da: ", chat[2], '\n')
-            time.sleep(3)
+            print(Fore.LIGHTYELLOW_EX +"Hai ricevuto un nuovo messaggio da:", chat[2])
+    
+    for chat in chats_2:
+        chat = chat.split(":")
+        lst_msg = int(redis_client.zrangebyscore(f"chat:{chat[1]}:{username}", '-inf', '+inf', withscores=True)[-1][1])
+        last_inte = int(redis_client.get(f"user:lst_interaction:{username}"))
+        if not redis_client.exists(f"user:lst_interaction:{username}"):
+            print(Fore.LIGHTYELLOW_EX +"Hai ricevuto un nuovo messaggio da:", chat[1])
+        elif last_inte < lst_msg:
+            print(Fore.LIGHTYELLOW_EX +"Hai ricevuto un nuovo messaggio da:", chat[1])
+    
+    
     return True
 
 if __name__ == '__main__':
     redis_client = start_client()
     ping_status = redis_client.ping()
     print("Ping successful:", ping_status)
+  
+    username = menu_accesso()
     while True:
-        username = menu_accesso()
         if username != False:
             list_of_contacts = []
-            menu_principale(username)
+            username=menu_principale(username)
         else:
             print('close')
             break
+
