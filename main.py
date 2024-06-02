@@ -83,7 +83,8 @@ def menu_accesso():
         try:
             os.system('cls' if os.name == 'nt' else 'clear')
             choice = int(input('-1: Login\n-2: Sign up\n'
-                               '-0:' + Fore.RED + ' Esci\n' + Style.RESET_ALL))
+                               '-0:' + Fore.RED + 
+                               ' Esci\n' + Style.RESET_ALL))
             os.system('cls' if os.name == 'nt' else 'clear')
             match choice:
                 case 1:
@@ -186,12 +187,12 @@ def crea_callback(username):
 
         if check_username == username:
             formattato = ('     ' * 8 +
-                          Back.GREEN + Fore.BLACK + f' io> {msg} ' + Style.RESET_ALL + '\n' +
+                        Back.GREEN + Fore.BLACK + f' io> {msg} ' + Style.RESET_ALL + '\n' +
                           '     ' * 8 + f'{formatted_date}')
         else:
             formattato = (Back.WHITE + Fore.BLACK +
-                          f' {check_username}< {msg} ' + Style.RESET_ALL
-                          + '\n' + f'{formatted_date}')
+                        f' {check_username}< {msg} ' + Style.RESET_ALL
+                        + '\n' + f'{formatted_date}')
         print(formattato)
 
     return callback
@@ -206,7 +207,7 @@ def stampa_messeggi_precedenti(key,contacts, contact_choice):
           print('     ' * 8 + Back.GREEN + Fore.BLACK + f' io> {chat[2]} ' +
                  Style.RESET_ALL + '\n' + '     ' * 8 + f'  {formatted_date}')
         else:
-          print(Back.WHITE + Fore.BLACK + f' {contacts[contact_choice]}< ' + f'{chat[2]} '
+            print(Back.WHITE + Fore.BLACK + f' {contacts[contact_choice]}< ' + f'{chat[2]} '
                 + Style.RESET_ALL + f'\n  {formatted_date}')
 
 def visualizza_chat_temp(contacts, contact_choice): 
@@ -247,7 +248,7 @@ def visualizza_chat_temp(contacts, contact_choice):
             print("Errore, l'utente selezionato è in modalità non disturbare. "
                     "Non è pertanto raggiungibile fino a quando la modalità non disturbare "
                     "sarà disattivata")
-            time.sleep(2)
+            time.sleep(4)
             break
         
         # richiesta del messaggio da scrivere
@@ -298,10 +299,10 @@ def visualizza_chat(contacts, contact_choice):
     while True:
         # controllo se l'utente è in modalità non disturbare
         if redis_client.getbit('user:dnd',
-                               redis_client.hget('user:bit', contacts[contact_choice])) == 1:
+                            redis_client.hget('user:bit', contacts[contact_choice])) == 1:
             print(Fore.RED + "L'utente selezionato è in modalità non disturbare.\n"
-                             " Non è pertanto raggiungibile fino a quando la modalità non disturbare non"
-                             "sarà disattivata" + Style.RESET_ALL)
+                            " Non è pertanto raggiungibile fino a quando la modalità non disturbare non"
+                            "sarà disattivata" + Style.RESET_ALL)
             time.sleep(2)
             break
 
@@ -383,8 +384,8 @@ def menu_non_disturbare():
         try:
             choice_dnd = int(
                 input("-1: Disattiva la modalità non disturbare\n"
-                      "-2: Attiva la modalità non disturbare\n"
-                      "-0: " + Fore.RED + "Indietro\n" + Style.RESET_ALL))
+                    "-2: Attiva la modalità non disturbare\n"
+                    "-0: " + Fore.RED + "Indietro\n" + Style.RESET_ALL))
             match choice_dnd:
                 case 1:
                     do_not_disturb(username, choice_dnd)
@@ -448,8 +449,10 @@ def check_new_message(username):
         last_inte = int(redis_client.get(f"user:lst_interaction:{username}"))
         if not redis_client.exists(f"user:lst_interaction:{username}"):
             print(Fore.LIGHTYELLOW_EX +"Hai ricevuto un nuovo messaggio da:", chat[2])
+            time.sleep(3)
         elif last_inte < lst_msg:
             print(Fore.LIGHTYELLOW_EX +"Hai ricevuto un nuovo messaggio da:", chat[2])
+            time.sleep(3)
     
     for chat in chats_2:
         chat = chat.split(":")
@@ -457,9 +460,10 @@ def check_new_message(username):
         last_inte = int(redis_client.get(f"user:lst_interaction:{username}"))
         if not redis_client.exists(f"user:lst_interaction:{username}"):
             print(Fore.LIGHTYELLOW_EX +"Hai ricevuto un nuovo messaggio da:", chat[1])
+            time.sleep(3)
         elif last_inte < lst_msg:
             print(Fore.LIGHTYELLOW_EX +"Hai ricevuto un nuovo messaggio da:", chat[1])
-    
+            time.sleep(3)
     
     return True
 
@@ -467,7 +471,7 @@ if __name__ == '__main__':
     redis_client = start_client()
     ping_status = redis_client.ping()
     print("Ping successful:", ping_status)
-  
+
     username = menu_accesso()
     while True:
         if username != False:
@@ -476,4 +480,3 @@ if __name__ == '__main__':
         else:
             print('close')
             break
-
